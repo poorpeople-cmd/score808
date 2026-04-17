@@ -105,91 +105,6 @@
 
 
 
-# name: Project 3 - Direct OK.ru Streamer (Low Quality + Multi Keys)
-
-# on:
-#   workflow_dispatch:
-#     inputs:
-#       m3u8_url:
-#         description: 'Direct M3U8 Link Paste Karein'
-#         required: true
-#         type: string
-#       referer_url:
-#         description: 'Referer URL (e.g., https://site.com/)'
-#         required: true
-#         type: string
-#       stream_id:
-#         description: 'Select Stream Server ID (1, 2, 3, or 4)'
-#         required: true
-#         type: choice
-#         options:
-#           - '1'
-#           - '2'
-#           - '3'
-#           - '4'
-#         default: '1'
-
-# jobs:
-#   run-ffmpeg-stream:
-#     runs-on: ubuntu-latest
-#     timeout-minutes: 360 # 6 Ghante ki limit
-
-#     steps:
-#     - name: Install FFmpeg
-#       run: |
-#         sudo apt-get update
-#         sudo apt-get install -y ffmpeg
-
-#     - name: Start Broadcasting to OK.ru
-#       run: |
-#         echo "🚀 Stream Shuru Ho Rahi Hai (360p Low Quality Mode with Proxy)..."
-        
-#         # 🔑 Stream ID ko Project 2 wali actual Keys mein convert karna
-#         case "${{ inputs.stream_id }}" in
-#           "1") STREAM_KEY="14601603391083_14040893622891_puxzrwjniu" ;;
-#           "2") STREAM_KEY="14601696583275_14041072274027_apdzpdb5xi" ;;
-#           "3") STREAM_KEY="14617940008555_14072500914795_ohw67ls7ny" ;;
-#           "4") STREAM_KEY="14601972227691_14041593547371_obdhgewlmq" ;;
-#           *) STREAM_KEY="14601603391083_14040893622891_puxzrwjniu" ;; # Default
-#         esac
-
-#         echo "🔑 Selected Stream Key ID: ${{ inputs.stream_id }}"
-        
-#         # FFmpeg Command (With Proxy)
-#         ffmpeg -reconnect 1 -reconnect_at_eof 1 -reconnect_streamed 1 -reconnect_delay_max 5 -timeout 2000000000 \
-#                -err_detect ignore_err -ignore_unknown \
-#                -http_proxy "http://cjasfidu:qhnyvm0qpf6p@31.59.20.176:6754" \
-#                -headers "Referer: ${{ inputs.referer_url }}" \
-#                -user_agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36" \
-#                -i "${{ inputs.m3u8_url }}" \
-#                -c:v libx264 -preset ultrafast -b:v 300k -vf scale=640:360 -r 20 \
-#                -c:a aac -b:a 32k \
-#                -f flv -flvflags no_duration_filesize "rtmp://vsu.okcdn.ru/input/$STREAM_KEY"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# ============== agar below code ko run karty hu too baqi all files ko commnet karo qunky yeh srf ffpmeg command hai ok ====================================
-
-
 name: Project 3 - Direct OK.ru Streamer (Low Quality + Multi Keys)
 
 on:
@@ -227,7 +142,7 @@ jobs:
 
     - name: Start Broadcasting to OK.ru
       run: |
-        echo "🚀 Stream Shuru Ho Rahi Hai (360p Low Quality Mode)..."
+        echo "🚀 Stream Shuru Ho Rahi Hai (360p Low Quality Mode with Proxy)..."
         
         # 🔑 Stream ID ko Project 2 wali actual Keys mein convert karna
         case "${{ inputs.stream_id }}" in
@@ -240,9 +155,94 @@ jobs:
 
         echo "🔑 Selected Stream Key ID: ${{ inputs.stream_id }}"
         
-        # FFmpeg Command (Low quality settings ke sath aur Dynamic Stream Key variable)
-        ffmpeg -headers "Referer: ${{ inputs.referer_url }}" \
+        # FFmpeg Command (With Proxy)
+        ffmpeg -reconnect 1 -reconnect_at_eof 1 -reconnect_streamed 1 -reconnect_delay_max 5 -timeout 2000000000 \
+               -err_detect ignore_err -ignore_unknown \
+               -http_proxy "http://cjasfidu:qhnyvm0qpf6p@31.59.20.176:6754" \
+               -headers "Referer: ${{ inputs.referer_url }}" \
                -user_agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36" \
                -i "${{ inputs.m3u8_url }}" \
-               -c:v libx264 -preset ultrafast -b:v 300k -vf scale=640:360 -r 20 -c:a aac -b:a 32k \
-               -f flv "rtmp://vsu.okcdn.ru/input/$STREAM_KEY"
+               -c:v libx264 -preset ultrafast -b:v 300k -vf scale=640:360 -r 20 \
+               -c:a aac -b:a 32k \
+               -f flv -flvflags no_duration_filesize "rtmp://vsu.okcdn.ru/input/$STREAM_KEY"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ============== agar below code ko run karty hu too baqi all files ko commnet karo qunky yeh srf ffpmeg command hai ok ====================================
+
+
+# name: Project 3 - Direct OK.ru Streamer (Low Quality + Multi Keys)
+
+# on:
+#   workflow_dispatch:
+#     inputs:
+#       m3u8_url:
+#         description: 'Direct M3U8 Link Paste Karein'
+#         required: true
+#         type: string
+#       referer_url:
+#         description: 'Referer URL (e.g., https://site.com/)'
+#         required: true
+#         type: string
+#       stream_id:
+#         description: 'Select Stream Server ID (1, 2, 3, or 4)'
+#         required: true
+#         type: choice
+#         options:
+#           - '1'
+#           - '2'
+#           - '3'
+#           - '4'
+#         default: '1'
+
+# jobs:
+#   run-ffmpeg-stream:
+#     runs-on: ubuntu-latest
+#     timeout-minutes: 360 # 6 Ghante ki limit
+
+#     steps:
+#     - name: Install FFmpeg
+#       run: |
+#         sudo apt-get update
+#         sudo apt-get install -y ffmpeg
+
+#     - name: Start Broadcasting to OK.ru
+#       run: |
+#         echo "🚀 Stream Shuru Ho Rahi Hai (360p Low Quality Mode)..."
+        
+#         # 🔑 Stream ID ko Project 2 wali actual Keys mein convert karna
+#         case "${{ inputs.stream_id }}" in
+#           "1") STREAM_KEY="14601603391083_14040893622891_puxzrwjniu" ;;
+#           "2") STREAM_KEY="14601696583275_14041072274027_apdzpdb5xi" ;;
+#           "3") STREAM_KEY="14617940008555_14072500914795_ohw67ls7ny" ;;
+#           "4") STREAM_KEY="14601972227691_14041593547371_obdhgewlmq" ;;
+#           *) STREAM_KEY="14601603391083_14040893622891_puxzrwjniu" ;; # Default
+#         esac
+
+#         echo "🔑 Selected Stream Key ID: ${{ inputs.stream_id }}"
+        
+#         # FFmpeg Command (Low quality settings ke sath aur Dynamic Stream Key variable)
+#         ffmpeg -headers "Referer: ${{ inputs.referer_url }}" \
+#                -user_agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36" \
+#                -i "${{ inputs.m3u8_url }}" \
+#                -c:v libx264 -preset ultrafast -b:v 300k -vf scale=640:360 -r 20 -c:a aac -b:a 32k \
+#                -f flv "rtmp://vsu.okcdn.ru/input/$STREAM_KEY"
