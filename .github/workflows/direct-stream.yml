@@ -142,7 +142,7 @@ jobs:
 
     - name: Start Broadcasting to OK.ru
       run: |
-        echo "🚀 Stream Shuru Ho Rahi Hai (360p Low Quality Mode with Auto-Reconnect)..."
+        echo "🚀 Stream Shuru Ho Rahi Hai (360p Low Quality Mode with Proxy)..."
         
         # 🔑 Stream ID ko Project 2 wali actual Keys mein convert karna
         case "${{ inputs.stream_id }}" in
@@ -155,13 +155,16 @@ jobs:
 
         echo "🔑 Selected Stream Key ID: ${{ inputs.stream_id }}"
         
-        # FFmpeg Command (Auto-reconnect aur Low quality settings ke sath)
-        ffmpeg -reconnect 1 -reconnect_at_eof 1 -reconnect_streamed 1 -reconnect_delay_max 5 \
+        # FFmpeg Command (With Proxy)
+        ffmpeg -reconnect 1 -reconnect_at_eof 1 -reconnect_streamed 1 -reconnect_delay_max 5 -timeout 2000000000 \
+               -err_detect ignore_err -ignore_unknown \
+               -http_proxy "http://cjasfidu:qhnyvm0qpf6p@31.59.20.176:6754" \
                -headers "Referer: ${{ inputs.referer_url }}" \
                -user_agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36" \
                -i "${{ inputs.m3u8_url }}" \
-               -c:v libx264 -preset ultrafast -b:v 300k -vf scale=640:360 -r 20 -c:a aac -b:a 32k \
-               -f flv "rtmp://vsu.okcdn.ru/input/$STREAM_KEY"
+               -c:v libx264 -preset ultrafast -b:v 300k -vf scale=640:360 -r 20 \
+               -c:a aac -b:a 32k \
+               -f flv -flvflags no_duration_filesize "rtmp://vsu.okcdn.ru/input/$STREAM_KEY"
 
 
 
