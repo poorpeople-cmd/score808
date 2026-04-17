@@ -190,14 +190,14 @@ jobs:
     timeout-minutes: 360 # 6 Ghante ki limit
 
     steps:
-    - name: Install Dependencies (FFmpeg, Xvfb, Chrome, PulseAudio)
+    - name: Install Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y ffmpeg xvfb pulseaudio dbus-x11 google-chrome-stable
+        sudo apt-get install -y ffmpeg xvfb pulseaudio dbus-x11 google-chrome-stable xdotool
 
     - name: Start Broadcasting to OK.ru
       run: |
-        echo "🚀 Naqli Screen (Xvfb) Aur Google Chrome Setup Ho Raha Hai..."
+        echo "🚀 Naqli Screen Setup Aur Google Chrome..."
         
         # Stream Keys
         case "${{ inputs.stream_id }}" in
@@ -214,22 +214,28 @@ jobs:
         set -x default-sink v1
         set -x default-source v1.monitor
 
-        # 2. Fake Screen Setup (CPU bachane ke liye 854x480)
+        # 2. Fake Screen Setup (854x480)
         export DISPLAY=:99
         Xvfb :99 -screen 0 854x480x24 &
         sleep 2
 
-        # 3. DBus Error Fix
         export DBUS_SESSION_BUS_ADDRESS=/dev/null
 
-        # 4. Google Chrome Start (Lightweight Flags ke sath)
+        # 3. Google Chrome Start
         echo "🌍 Chrome Par Match Khol Rahe Hain..."
         google-chrome --window-size=854,480 --kiosk --start-fullscreen --no-sandbox --disable-dev-shm-usage --disable-gpu --autoplay-policy=no-user-gesture-required "${{ inputs.player_url }}" &
         
-        # Chrome ko load hone ka time dena (15 seconds)
+        # Chrome ko poora load hone dein (15 seconds)
         sleep 15 
 
-        # 5. FFmpeg se Screen Capture (Optimized for GitHub CPU)
+        # 4. Asal Trick: Fake Mouse Click (Play Button dabane ke liye)
+        echo "🖱️ Screen ke beech mein Click kar rahe hain taake Play ho jaye..."
+        xdotool mousemove 427 240 click 1
+        sleep 2
+        # Ek aur click ihtiyat ke taur par
+        xdotool click 1
+
+        # 5. FFmpeg se Screen Capture
         echo "🎥 Screen Recording aur Streaming Shuru!"
         ffmpeg -thread_queue_size 1024 -f x11grab -video_size 854x480 -framerate 20 -i :99 \
                -thread_queue_size 1024 -f pulse -i default \
