@@ -61,7 +61,7 @@ jobs:
         esac
         echo "🔑 Selected Stream Key: $STREAM_KEY"
 
-        # 1️⃣ Background mein Proxy Script chalana (& lagana zaroori hai)
+        # 1️⃣ Background mein Proxy Script chalana (& lagana zaroori hai taake workflow ruka na rahe)
         node proxy.js &
         
         # Proxy start hone ka 3 second wait karna
@@ -69,9 +69,9 @@ jobs:
         
         echo "🚀 FFmpeg Stream Shuru Ho Rahi Hai (Low Quality Mode)..."
         
-        # 2️⃣ FFmpeg ko direct URL ki jagah Local Proxy (127.0.0.1:8080) se connect karna
+        # 2️⃣ FFmpeg ko direct URL ki jagah Local Proxy (127.0.0.1:8080/stream.ts) se connect karna
         ffmpeg -re -loglevel error \
-               -i "http://127.0.0.1:8080/live.m3u8" \
+               -i "http://127.0.0.1:8080/stream.ts" \
                -c:v libx264 -preset ultrafast -b:v 300k -vf scale=640:360 -r 20 -c:a aac -b:a 32k \
                -f flv "rtmp://vsu.okcdn.ru/input/$STREAM_KEY"
 
