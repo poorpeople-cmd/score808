@@ -208,32 +208,34 @@ jobs:
           *) STREAM_KEY="14601603391083_14040893622891_puxzrwjniu" ;;
         esac
 
-        # 1. Fake Audio Setup (Taake Chrome aawaz nikal sake)
+        # 1. Fake Audio Setup
         pulseaudio -D --exit-idle-time=-1
         pacmd load-module module-virtual-sink sink_name=v1
         set -x default-sink v1
         set -x default-source v1.monitor
 
-        # 2. Fake Screen Setup (1280x720)
-        Xvfb :99 -screen 0 1280x720x24 &
+        # 2. Fake Screen Setup (CPU bachane ke liye 854x480)
         export DISPLAY=:99
+        Xvfb :99 -screen 0 854x480x24 &
         sleep 2
 
-        # 3. Google Chrome Start Karna (Autoplay ke sath)
+        # 3. DBus Error Fix
+        export DBUS_SESSION_BUS_ADDRESS=/dev/null
+
+        # 4. Google Chrome Start (Lightweight Flags ke sath)
         echo "🌍 Chrome Par Match Khol Rahe Hain..."
-        google-chrome --window-size=1280,720 --kiosk --start-fullscreen --no-sandbox --disable-gpu --autoplay-policy=no-user-gesture-required "${{ inputs.player_url }}" &
+        google-chrome --window-size=854,480 --kiosk --start-fullscreen --no-sandbox --disable-dev-shm-usage --disable-gpu --autoplay-policy=no-user-gesture-required "${{ inputs.player_url }}" &
         
         # Chrome ko load hone ka time dena (15 seconds)
         sleep 15 
 
-        # 4. FFmpeg se Screen Capture Karke OK.ru par Bhejna
+        # 5. FFmpeg se Screen Capture (Optimized for GitHub CPU)
         echo "🎥 Screen Recording aur Streaming Shuru!"
-        ffmpeg -f x11grab -video_size 1280x720 -framerate 25 -i :99 \
-               -f pulse -i default \
-               -c:v libx264 -preset veryfast -b:v 1500k -maxrate 1500k -bufsize 3000k \
-               -c:a aac -b:a 128k -ac 2 \
+        ffmpeg -thread_queue_size 1024 -f x11grab -video_size 854x480 -framerate 20 -i :99 \
+               -thread_queue_size 1024 -f pulse -i default \
+               -c:v libx264 -preset ultrafast -b:v 800k -maxrate 800k -bufsize 1600k \
+               -c:a aac -b:a 96k -ac 2 \
                -f flv "rtmp://vsu.okcdn.ru/input/$STREAM_KEY"
-
 
 
 
