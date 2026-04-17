@@ -9,7 +9,7 @@ const REFERER = process.env.REFERER_URL;
 // Global Variables
 let currentTargetUrl = process.env.INITIAL_URL;
 let currentPlaylistUrl = ''; 
-let lastTsUrl = ''; 
+let playedChunks = new Set(); // 🧠 THE FIX: Video ki history yaad rakhne wali memory
 
 console.log(`\n🚀 [SYSTEM START] Initial Link: ${currentTargetUrl.substring(0, 60)}...`);
 
@@ -29,11 +29,10 @@ async function checkGitHubFile() {
         if (newLink && newLink !== currentTargetUrl && newLink.startsWith('http')) {
             console.log(`\n💥 [MAGIC SWAP!] Naya link detect hua: ${newLink.substring(0, 60)}...`);
             currentTargetUrl = newLink;
-            currentPlaylistUrl = ''; // Naya master link aaya hai, toh playlist url reset karo
+            currentPlaylistUrl = ''; 
+            playedChunks.clear(); // 🧠 SWAP par memory clear karo taake naya link fresh chalu ho
         }
-    } catch(e) { 
-        // File read error ko ignore karein taake loop chalta rahe
-    }
+    } catch(e) { }
 }
 setInterval(checkGitHubFile, 15000);
 
@@ -53,10 +52,10 @@ async function getActivePlaylist() {
     } catch (e) {
         console.log("⚠️ Master Playlist fetch error:", e.message);
     }
-    return currentTargetUrl; // Agar resolution list na mile toh wohi url use karo
+    return currentTargetUrl; 
 }
 
-// 🌐 THE BEAST: Continuous Stream Engine (Zero Downtime + Fast Fail)
+// 🌐 THE BEAST: Continuous Stream Engine (Zero Downtime + Anti-Rewind Memory)
 const server = http.createServer(async (req, res) => {
     if (req.url !== '/stream.ts') {
         res.writeHead(404); return res.end();
@@ -64,7 +63,6 @@ const server = http.createServer(async (req, res) => {
 
     console.log("🎥 FFmpeg Connected! Injecting Raw Video Stream...");
     
-    // FFmpeg ko lagay ga ke woh direct MP4/TS file download kar raha hai
     res.writeHead(200, {
         'Content-Type': 'video/MP2T',
         'Connection': 'keep-alive',
@@ -73,7 +71,6 @@ const server = http.createServer(async (req, res) => {
 
     let keepStreaming = true;
 
-    // Jab FFmpeg connection tode toh rok do
     req.on('close', () => {
         console.log("🛑 FFmpeg Disconnected.");
         keepStreaming = false;
@@ -87,49 +84,49 @@ const server = http.createServer(async (req, res) => {
             const lines = playlistRes.data.split('\n');
             const tsLinks = [];
             
-            // Saari TS files jama karna
             for (const line of lines) {
                 if (line && !line.startsWith('#')) {
                     tsLinks.push(line.startsWith('http') ? line : new URL(line, playlistUrl).toString());
                 }
             }
 
-            // Nayi TS file dhoondna jo humne pehle FFmpeg ko nahi bheji
-            let newTsIndex = tsLinks.indexOf(lastTsUrl);
-            if (newTsIndex === -1 || newTsIndex === tsLinks.length - 1) {
-                newTsIndex = Math.max(0, tsLinks.length - 3); // Agar naya aaye toh aakhri 3 se shuru karo
-            } else {
-                newTsIndex++; // Agla chunk bhejo
+            // 🧠 THE FIX: Sirf NEW chunks nikalna (jo memory mein nahi hain)
+            let newChunks = tsLinks.filter(url => !playedChunks.has(url));
+
+            // Agar naye link par achanak 5-6 chunks ikhatte aa jayen, toh live edge par rehne ke liye sirf aakhri 2 uthao
+            if (newChunks.length > 2) {
+                newChunks = newChunks.slice(-2);
             }
 
-            // TS files fetch karke FFmpeg ko pipe karna
-            for (let i = newTsIndex; i < tsLinks.length; i++) {
+            // Sirf naye chunks ko FFmpeg mein pipe karna
+            for (let tsUrl of newChunks) {
                 if (!keepStreaming) break;
-                const tsUrl = tsLinks[i];
                 
                 try {
-                    // 🛡️ FAST FAIL LOGIC: Sirf 3 second wait.
                     const tsRes = await axios.get(tsUrl, {
-                        responseType: 'arraybuffer', // Aadha data nahi, poora memory mein lo
+                        responseType: 'arraybuffer', 
                         timeout: 3000, 
                         headers: { 'Referer': REFERER }
                     });
                     
-                    // Chunk 100% download ho gaya, ab FFmpeg ko do
                     res.write(Buffer.from(tsRes.data)); 
-                    lastTsUrl = tsUrl;
+                    playedChunks.add(tsUrl); // 🧠 Clip ko memory mein save karo taake dobara play na ho
+                    
+                    // Server ki RAM bachane ke liye: Agar memory mein 100 se zyada clips ho jayen, toh sabse purani delete kar do
+                    if (playedChunks.size > 100) {
+                        const firstItem = playedChunks.values().next().value;
+                        playedChunks.delete(firstItem);
+                    }
                     
                 } catch (e) {
-                    // ⚠️ NO RETRY IN LIVE STREAM!
                     console.log(`⚠️ Internet drop! Chunk missed. Skipping to keep LIVE edge...`);
                 }
             }
 
-            // Live stream mein aglay chunk ka aane ka wait karna (aam taur par 2-3 second)
+            // 2 second wait karo taake streamer naya chunk upload kar le
             await new Promise(r => setTimeout(r, 2000));
 
         } catch (e) {
-            console.log("⚠️ Playlist fetch error, retrying...");
             await new Promise(r => setTimeout(r, 2000));
         }
     }
