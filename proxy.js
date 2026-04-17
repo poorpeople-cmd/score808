@@ -56,7 +56,7 @@ async function getActivePlaylist() {
     return currentTargetUrl; // Agar resolution list na mile toh wohi url use karo
 }
 
-// 🌐 THE BEAST: Continuous Stream Engine (Zero Downtime)
+// 🌐 THE BEAST: Continuous Stream Engine (Zero Downtime + Fast Fail)
 const server = http.createServer(async (req, res) => {
     if (req.url !== '/stream.ts') {
         res.writeHead(404); return res.end();
@@ -108,20 +108,20 @@ const server = http.createServer(async (req, res) => {
                 const tsUrl = tsLinks[i];
                 
                 try {
+                    // 🛡️ FAST FAIL LOGIC: Sirf 3 second wait.
                     const tsRes = await axios.get(tsUrl, {
-                        responseType: 'stream',
-                        timeout: 5000,
+                        responseType: 'arraybuffer', // Aadha data nahi, poora memory mein lo
+                        timeout: 3000, 
                         headers: { 'Referer': REFERER }
                     });
                     
-                    // TS data as-is FFmpeg ko pass karna
-                    await new Promise((resolve, reject) => {
-                        tsRes.data.pipe(res, { end: false });
-                        tsRes.data.on('end', () => { lastTsUrl = tsUrl; resolve(); });
-                        tsRes.data.on('error', reject);
-                    });
+                    // Chunk 100% download ho gaya, ab FFmpeg ko do
+                    res.write(Buffer.from(tsRes.data)); 
+                    lastTsUrl = tsUrl;
+                    
                 } catch (e) {
-                    console.log("⚠️ Chunk fetch error, skipping...");
+                    // ⚠️ NO RETRY IN LIVE STREAM!
+                    console.log(`⚠️ Internet drop! Chunk missed. Skipping to keep LIVE edge...`);
                 }
             }
 
