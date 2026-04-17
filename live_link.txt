@@ -1,1 +1,1 @@
-a
+https://jan.bhalocast.com:7059/hls/star1kibich.m3u8?md5=ncGY8O51KjWoxeVLCUInoA&expires=1776432885&ch=star1kibich&s=MTE2LjcxLjExLjI1MQ==
