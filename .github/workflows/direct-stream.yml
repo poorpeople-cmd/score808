@@ -1,0 +1,40 @@
+name: Project 3 - Direct OK.ru Streamer (Low Quality)
+
+on:
+  workflow_dispatch:
+    inputs:
+      m3u8_url:
+        description: 'Direct M3U8 Link Paste Karein'
+        required: true
+        type: string
+      referer_url:
+        description: 'Referer URL (e.g., https://site.com/)'
+        required: true
+        type: string
+      okru_stream_key:
+        description: 'OK.ru Stream Key Paste Karein'
+        required: true
+        type: string
+
+jobs:
+  run-ffmpeg-stream:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360 # 6 Ghante ki limit
+
+    steps:
+    # Step 1: Server par FFmpeg install karna
+    - name: Install FFmpeg
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ffmpeg
+
+    # Step 2: FFmpeg Command Run Karna (Project 2 wali Low-Quality Settings ke sath)
+    - name: Start Broadcasting to OK.ru
+      run: |
+        echo "🚀 Stream Shuru Ho Rahi Hai (360p Low Quality Mode)..."
+        
+        ffmpeg -headers "Referer: ${{ inputs.referer_url }}" \
+               -user_agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36" \
+               -i "${{ inputs.m3u8_url }}" \
+               -c:v libx264 -preset ultrafast -b:v 300k -vf scale=640:360 -r 20 -c:a aac -b:a 32k \
+               -f flv "rtmp://vsu.okcdn.ru/input/${{ inputs.okru_stream_key }}"
