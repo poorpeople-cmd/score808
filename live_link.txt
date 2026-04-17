@@ -1,1 +1,1 @@
-aaa
+https://jan.bhalocast.com:7059/hls/wextres.m3u8?md5=wEmMMdlAvKI0L18hBiCEbw&expires=1776432920&ch=wextres&s=MTE2LjcxLjExLjI1MQ==
