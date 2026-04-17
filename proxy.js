@@ -3,94 +3,138 @@ const axios = require('axios');
 const { URL } = require('url');
 
 const REPO = process.env.GITHUB_REPOSITORY;
-const TOKEN = process.env.GITHUB_TOKEN; // GitHub API ko access karne ke liye
+const TOKEN = process.env.GITHUB_TOKEN;
 const REFERER = process.env.REFERER_URL;
-let currentTarget = process.env.INITIAL_URL;
 
-console.log(`\n🚀 [SYSTEM START] Initial Link: ${currentTarget.substring(0, 60)}...`);
+// Global Variables
+let currentTargetUrl = process.env.INITIAL_URL;
+let currentPlaylistUrl = ''; 
+let lastTsUrl = ''; 
 
-// 🕵️‍♂️ Har 15 second baad GitHub par 'live_link.txt' file ko check karna
+console.log(`\n🚀 [SYSTEM START] Initial Link: ${currentTargetUrl.substring(0, 60)}...`);
+
+// 🕵️‍♂️ Har 15 second baad GitHub par 'live_link.txt' check karna
 async function checkGitHubFile() {
     try {
         const url = `https://api.github.com/repos/${REPO}/contents/live_link.txt`;
         const res = await axios.get(url, {
             headers: {
                 'Authorization': `Bearer ${TOKEN}`,
-                'Accept': 'application/vnd.github.v3.raw', // Cache bypass karke raw data lana
+                'Accept': 'application/vnd.github.v3.raw',
                 'Cache-Control': 'no-cache'
             }
         });
         
         const newLink = res.data.trim();
-        // Agar link naya hai aur valid (http se start hota hai)
-        if (newLink && newLink !== currentTarget && newLink.startsWith('http')) {
-            console.log(`\n💥 [MAGIC SWAP!] Aapne GitHub par naya link update kiya hai!`);
-            console.log(`🔗 Naya Link: ${newLink.substring(0, 60)}...`);
-            console.log(`✅ FFmpeg ko zero downtime ke sath naye link par transfer kar diya gaya hai.`);
-            currentTarget = newLink;
+        if (newLink && newLink !== currentTargetUrl && newLink.startsWith('http')) {
+            console.log(`\n💥 [MAGIC SWAP!] Naya link detect hua: ${newLink.substring(0, 60)}...`);
+            currentTargetUrl = newLink;
+            currentPlaylistUrl = ''; // Naya master link aaya hai, toh playlist url reset karo
         }
-    } catch(e) {
-        // Agar file read karne mein masla aaye toh ignore karo taake system na ruke
+    } catch(e) { 
+        // File read error ko ignore karein taake loop chalta rahe
     }
 }
 setInterval(checkGitHubFile, 15000);
 
-// 🌐 LOCAL HLS PROXY (Project 2 wala logic jo FFmpeg ko zinda rakhta hai)
-const server = http.createServer(async (req, res) => {
-    if (!currentTarget) { res.writeHead(503); return res.end('Not Ready'); }
-
+// 🛠️ Master M3U8 se Asal Video M3U8 nikalna
+async function getActivePlaylist() {
+    if (currentPlaylistUrl) return currentPlaylistUrl;
+    
     try {
-        let targetUrl = currentTarget;
-        if (req.url.startsWith('/proxy?target=')) {
-            targetUrl = decodeURIComponent(req.url.split('target=')[1]);
-        } else if (req.url !== '/live.m3u8') {
-            res.writeHead(404); return res.end();
+        const res = await axios.get(currentTargetUrl, { headers: { 'Referer': REFERER } });
+        const lines = res.data.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+            if (lines[i].includes('.m3u8')) {
+                currentPlaylistUrl = lines[i].startsWith('http') ? lines[i] : new URL(lines[i], currentTargetUrl).toString();
+                return currentPlaylistUrl;
+            }
         }
+    } catch (e) {
+        console.log("⚠️ Master Playlist fetch error:", e.message);
+    }
+    return currentTargetUrl; // Agar resolution list na mile toh wohi url use karo
+}
 
-        if (targetUrl.includes('.m3u8')) {
-            const response = await axios.get(targetUrl, {
-                responseType: 'text',
-                timeout: 15000,
-                headers: { 
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36', 
-                    'Referer': REFERER 
-                }
-            });
+// 🌐 THE BEAST: Continuous Stream Engine (Zero Downtime)
+const server = http.createServer(async (req, res) => {
+    if (req.url !== '/stream.ts') {
+        res.writeHead(404); return res.end();
+    }
 
-            const baseUrl = new URL(targetUrl);
-            const rewritten = response.data.split('\n').map(line => {
-                let tLine = line.trim();
-                if (tLine === '') return line;
-                if (tLine.startsWith('#')) {
-                    return tLine.replace(/URI="(.*?)"/g, (match, p1) => {
-                        let absUrl = p1.startsWith('http') ? p1 : new URL(p1, baseUrl).toString();
-                        return `URI="http://127.0.0.1:8080/proxy?target=${encodeURIComponent(absUrl)}"`;
-                    });
-                }
-                let absoluteUrl = tLine.startsWith('http') ? tLine : new URL(tLine, baseUrl).toString();
-                return `http://127.0.0.1:8080/proxy?target=${encodeURIComponent(absoluteUrl)}`;
-            }).join('\n');
+    console.log("🎥 FFmpeg Connected! Injecting Raw Video Stream...");
+    
+    // FFmpeg ko lagay ga ke woh direct MP4/TS file download kar raha hai
+    res.writeHead(200, {
+        'Content-Type': 'video/MP2T',
+        'Connection': 'keep-alive',
+        'Cache-Control': 'no-cache'
+    });
 
-            res.writeHead(200, { 'Content-Type': 'application/vnd.apple.mpegurl' });
-            res.end(rewritten);
+    let keepStreaming = true;
+
+    // Jab FFmpeg connection tode toh rok do
+    req.on('close', () => {
+        console.log("🛑 FFmpeg Disconnected.");
+        keepStreaming = false;
+    });
+
+    while (keepStreaming) {
+        try {
+            const playlistUrl = await getActivePlaylist();
+            const playlistRes = await axios.get(playlistUrl, { headers: { 'Referer': REFERER } });
             
-        } else {
-            const response = await axios.get(targetUrl, {
-                responseType: 'stream',
-                timeout: 15000,
-                headers: { 
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36', 
-                    'Referer': REFERER 
+            const lines = playlistRes.data.split('\n');
+            const tsLinks = [];
+            
+            // Saari TS files jama karna
+            for (const line of lines) {
+                if (line && !line.startsWith('#')) {
+                    tsLinks.push(line.startsWith('http') ? line : new URL(line, playlistUrl).toString());
                 }
-            });
-            res.writeHead(200, { 'Content-Type': response.headers['content-type'] || 'video/MP2T' });
-            response.data.pipe(res);
+            }
+
+            // Nayi TS file dhoondna jo humne pehle FFmpeg ko nahi bheji
+            let newTsIndex = tsLinks.indexOf(lastTsUrl);
+            if (newTsIndex === -1 || newTsIndex === tsLinks.length - 1) {
+                newTsIndex = Math.max(0, tsLinks.length - 3); // Agar naya aaye toh aakhri 3 se shuru karo
+            } else {
+                newTsIndex++; // Agla chunk bhejo
+            }
+
+            // TS files fetch karke FFmpeg ko pipe karna
+            for (let i = newTsIndex; i < tsLinks.length; i++) {
+                if (!keepStreaming) break;
+                const tsUrl = tsLinks[i];
+                
+                try {
+                    const tsRes = await axios.get(tsUrl, {
+                        responseType: 'stream',
+                        timeout: 5000,
+                        headers: { 'Referer': REFERER }
+                    });
+                    
+                    // TS data as-is FFmpeg ko pass karna
+                    await new Promise((resolve, reject) => {
+                        tsRes.data.pipe(res, { end: false });
+                        tsRes.data.on('end', () => { lastTsUrl = tsUrl; resolve(); });
+                        tsRes.data.on('error', reject);
+                    });
+                } catch (e) {
+                    console.log("⚠️ Chunk fetch error, skipping...");
+                }
+            }
+
+            // Live stream mein aglay chunk ka aane ka wait karna (aam taur par 2-3 second)
+            await new Promise(r => setTimeout(r, 2000));
+
+        } catch (e) {
+            console.log("⚠️ Playlist fetch error, retrying...");
+            await new Promise(r => setTimeout(r, 2000));
         }
-    } catch (err) {
-        res.writeHead(500); res.end();
     }
 });
 
 server.listen(8080, () => {
-    console.log(`[🌐 PROXY] Local Server Ready at http://127.0.0.1:8080`);
+    console.log(`[🌐 PROXY] Continuous Stream Engine Ready at http://127.0.0.1:8080/stream.ts`);
 });
